@@ -1,0 +1,45 @@
+# PROD-side egress capture overlay.
+# Customer adds this to their existing docker-compose stack:
+#   docker compose -f docker-compose.yml -f docker-compose.prod-capture.yml up -d
+#
+# Pre-requisites on the customer side:
+#  - PDM containers MUST have HTTP_PROXY/HTTPS_PROXY pointed at hoverfly:8500
+#    and the bundled CA in their trust store.
+#  - For SSH bastion: outgoing SSH must be routed via the bastion
+#    (e.g. via ~/.ssh/config ProxyJump, OR by replacing target hostnames with bastion).
+services:
+  pdm-hoverfly-capture:
+    image: spectolabs/hoverfly:v1.10.4
+    container_name: pdm_hoverfly_capture
+    command: ["-listen-on-host", "0.0.0.0",
+              "-disable-cache",
+              "-cert", "/certs/ca.crt",
+              "-key", "/certs/ca.key",
+              "-mode", "capture"]
+    volumes:
+      - ./hoverfly-certs:/certs:ro
+      - ./hoverfly-data:/data
+    ports:
+      - "127.0.0.1:8888:8888"
+      - "127.0.0.1:8500:8500"
+    restart: unless-stopped
+
+  pdm-ssh-bastion:
+    build:
+      context: ./ssh-bastion
+    container_name: pdm_ssh_bastion
+    environment:
+      SSH_PORT: "22"
+      BASTION_TARGET_HOST: ${PDM_BASTION_TARGET_HOST}
+      BASTION_TARGET_USER: ${PDM_BASTION_TARGET_USER}
+      BASTION_TARGET_PORT: "${PDM_BASTION_TARGET_PORT:-22}"
+      BASTION_FORWARD_KEY: /keys/forward_id_rsa
+      BASTION_CAPTURE_FILE: /captures/ssh-capture.jsonl
+      BASTION_REDACT_REGEX: '${PDM_BASTION_REDACT_REGEX}'
+    volumes:
+      - ./ssh-bastion-keys:/keys:ro
+      - ./ssh-captures:/captures
+    ports:
+      - "${PDM_BASTION_PORT:-2222}:22"
+    restart: unless-stopped
+    profiles: ["bastion"]

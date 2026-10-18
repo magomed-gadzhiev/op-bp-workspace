@@ -1,0 +1,24 @@
+# Сценарий: Script exception (класс 2.4).
+#
+# БП дёргает скрипт `calc_bonus.py`, который ловит `None` от
+# `lookup_rate()` и падает на `rate * amount` → TypeError.
+#
+# Что должен сказать скилл:
+#   Корень: Script exception (TypeError) в
+#   processes/<bp>/scripts/calc_bonus.py:12 — `rate` is None, потому
+#   что lookup_rate() вернул None для unknown department.
+#   Фикс: добавить guard `if rate is None: raise BusinessError(...)`
+#   либо дефолтное значение.
+#   Регрессионный кейс: повторить с тем же entity, проверить
+#   final_status: error.
+name: "Calc bonus — unknown department"
+fixtures: []
+entity:
+  type: payroll_entry
+  fields:
+    employee_id: 999
+    department: "UNKNOWN"
+    amount: 50000
+timeout_sec: 30
+expect:
+  final_status: completed   # ожидание ложное → реально будет error

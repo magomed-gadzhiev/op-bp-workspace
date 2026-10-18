@@ -1,0 +1,26 @@
+# pdm-cli dev image. pdm is baked in so `docker run --rm op-pdm-cli-dev pdm ...`
+# works standalone; the compose service additionally mounts /work and the
+# entrypoint reinstalls in editable mode for live source edits.
+FROM python:3.11-slim
+
+ENV VIRTUAL_ENV=/opt/venv \
+    PATH=/opt/venv/bin:$PATH \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/* \
+    && python -m venv $VIRTUAL_ENV
+
+# Bake pdm-cli into the image.
+COPY pyproject.toml /opt/pdm-cli/pyproject.toml
+COPY src /opt/pdm-cli/src
+RUN pip install -e "/opt/pdm-cli[dev,mcp]" --no-warn-script-location
+
+WORKDIR /work
+
+COPY entrypoint-dev.sh /usr/local/bin/entrypoint-dev.sh
+RUN chmod +x /usr/local/bin/entrypoint-dev.sh
+CMD ["/usr/local/bin/entrypoint-dev.sh"]

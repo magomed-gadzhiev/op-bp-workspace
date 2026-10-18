@@ -1,0 +1,21 @@
+fields:
+- field_type: string
+  name: title
+items:
+- data:
+    title: Поставка
+  name: Поставка
+  uuid: 45ad834b-1a84-4424-8e4a-7e56fb3106c1
+- data:
+    title: Услуги (работы)
+  name: Услуги (работы)
+  uuid: 3f50077f-1e66-4e7e-a526-d365729c7be6
+- data:
+    title: Подряд
+  name: Подряд
+  uuid: 2094c033-c0a0-45a0-b5fe-9944c0b18e45
+- data:
+    title: Лицензия
+  name: Лицензия
+  uuid: 024804f3-c2f6-48c4-9f7a-27d29b7e0165
+name: Тип договора

@@ -1,0 +1,23 @@
+# Сценарий: SSH no-match (класс 2.3).
+#
+# Ожидание: БП делает `bash deploy_release.sh --env prod` на
+# deploy.local. Фикстура матчит только `deploy_release.sh` без
+# аргументов (`command_matches: "^deploy_release\\.sh$"`), поэтому
+# ssh-replay возвращает exit 127 и `matched_fixture: null`.
+#
+# Что должен сказать скилл:
+#   Корень: SSH no-match. В fixtures/ssh-deploy.yaml поле
+#   command_matches: "^deploy_release\\.sh$" — слишком строгое, не
+#   пускает `--env prod`. Фикс: ослабить regex до
+#   "deploy_release\\.sh( |$)" или захватить аргументы named-group'ом.
+name: "Deploy release"
+fixtures: [ssh-deploy]
+entity_id: 17
+timeout_sec: 60
+expect:
+  final_status: completed
+  side_effects:
+    - kind: ssh
+      host: deploy.local
+      command_matches: "deploy_release\\.sh"
+      min_count: 1

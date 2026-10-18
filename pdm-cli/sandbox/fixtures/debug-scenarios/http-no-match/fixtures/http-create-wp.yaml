@@ -1,0 +1,20 @@
+# Намеренно НЕДОПОКРЫТАЯ фикстура: матчер не учитывает
+# X-Idempotency-Key, который реально шлёт БП. Hoverfly в simulate
+# вернёт 502 → класс 2.2 в скилле.
+meta:
+  schemaVersion: "v2"
+data:
+  pairs:
+    - request:
+        method:
+          - matcher: exact
+            value: POST
+        path:
+          - matcher: exact
+            value: /api/v3/work_packages
+        # отсутствует requiresState / headers для X-Idempotency-Key
+      response:
+        status: 201
+        body: '{"id": 42, "subject": "stub"}'
+        headers:
+          Content-Type: [application/json]

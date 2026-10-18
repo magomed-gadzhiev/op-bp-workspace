@@ -1,0 +1,35 @@
+approver_resolution:
+  mode: org_unit_head
+  unit_source:
+    kind: document_field
+    ref: Карточка договора.Подразделение
+auto_start_on_open: true
+card_fields_config:
+  Лист согласования:
+  - Решение руководителя
+  - Комментарий руководителя
+documents_display_order:
+- Карточка договора
+- Лист согласования
+editable_entity_types:
+- Лист согласования
+name: Утверждение руководителем
+order: 50
+readable_entity_types:
+- Карточка договора
+reject_target_task: Регистрация договора
+responsible_groups:
+- dogovor:heads
+script_bindings:
+- script_name: record_decision
+- script_name: on_reject_note
+  script_type: on_reject
+start_condition:
+  condition_tree:
+    condition: and
+    rules:
+    - assignment_task: Согласование — служба безопасности
+      operator: equals
+      value: completed
+watcher_groups:
+- dogovor:watchers

@@ -1,0 +1,20 @@
+assign_to_starter: true
+auto_start_on_open: true
+documents_display_order:
+- Карточка договора
+- Лист согласования
+is_final: true
+name: Регистрация итога
+order: 60
+readable_entity_types:
+- Карточка договора
+- Лист согласования
+script_bindings:
+- script_name: finalize
+start_condition:
+  condition_tree:
+    condition: and
+    rules:
+    - assignment_task: Утверждение руководителем
+      operator: equals
+      value: completed

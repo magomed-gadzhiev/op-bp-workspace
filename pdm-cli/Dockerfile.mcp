@@ -1,0 +1,28 @@
+# mcp-pdm-bp: chat-edit MCP server для тестовой версии БП (спека 143, ADR-0059).
+# Правки живут в workspace черновиков (volume ./.pdm, env
+# MCP_BP_DRAFTS_ROOT=/work/.pdm/drafts); git-цикла нет (Д8) — git в образ
+# не ставится. В отличие от Dockerfile.dev — без dev-экстры, только [mcp].
+FROM python:3.11-slim
+
+ENV VIRTUAL_ENV=/opt/venv \
+    PATH=/opt/venv/bin:$PATH \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+RUN apt-get update \
+    && rm -rf /var/lib/apt/lists/* \
+    && python -m venv $VIRTUAL_ENV
+
+# Bake pdm-cli into the image (как в Dockerfile.dev).
+COPY pyproject.toml /opt/pdm-cli/pyproject.toml
+COPY src /opt/pdm-cli/src
+RUN pip install -e "/opt/pdm-cli[mcp]" --no-warn-script-location
+
+# bp_test (спека 142, волна B): конфиг песочницы для контура агента —
+# только топология сервисов стенда; секреты приходят env/.pdm (см.
+# docker-compose.full.yml → mcp-pdm-bp и pdm_cli/config.py).
+COPY pdm.config.mcp-bp.yaml /work/pdm.config.yaml
+
+WORKDIR /work
+CMD ["pdm", "defmcp", "serve", "--host", "0.0.0.0", "--port", "8016"]

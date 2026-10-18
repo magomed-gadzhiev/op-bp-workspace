@@ -1,0 +1,18 @@
+# docker-compose.ci-override.yml — memory limits for github-hosted runners (Etap 9 C5)
+# Usage: docker compose -f docker-compose.sandbox.yml -f docker-compose.ci-override.yml up -d
+
+services:
+  pdm-backend:
+    mem_limit: 512m
+  pdm-postgres:
+    mem_limit: 256m
+  pdm-postgres-sandbox:
+    mem_limit: 256m
+  hoverfly:
+    mem_limit: 128m
+  ssh-replay:
+    mem_limit: 64m
+  ssh-bastion:
+    mem_limit: 64m
+  egress-log-writer:
+    mem_limit: 64m

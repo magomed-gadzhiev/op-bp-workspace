@@ -1,0 +1,4 @@
+config: {}
+kind: script
+slug: calc-bonus
+title: Calculate bonus

@@ -1,0 +1,13 @@
+# Намеренно СЛИШКОМ СТРОГИЙ матчер: реальный вызов БП —
+# `deploy_release.sh --env prod`, regex же требует строки без
+# аргументов. → exit 127, matched_fixture: null, класс 2.3.
+meta:
+  schemaVersion: "v1"
+fixtures:
+  - host: deploy.local
+    user: deploy
+    command_matches: "^deploy_release\\.sh$"
+    response:
+      exit_code: 0
+      stdout: "release deployed\n"
+      stderr: ""

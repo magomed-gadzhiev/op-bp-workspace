@@ -1,0 +1,12 @@
+description: >-
+  <p>Форма команды «Вернуть на доработку»: причина и срок.</p>
+fields:
+- field_type: text
+  name: Причина возврата
+  order: 0
+  required: true
+- field_type: date
+  name: Срок доработки
+  order: 1
+name: Доработка договора
+system_type: document

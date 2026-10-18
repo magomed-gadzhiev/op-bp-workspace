@@ -1,0 +1,19 @@
+# Корректная фикстура — она бы матчила запрос, если бы БП его сделал.
+# Падение здесь не про no-match, а про assertion: ожидаемого вызова
+# нет в Hoverfly journal вообще.
+meta:
+  schemaVersion: "v2"
+data:
+  pairs:
+    - request:
+        method:
+          - matcher: exact
+            value: POST
+        path:
+          - matcher: exact
+            value: /api/v3/work_packages
+      response:
+        status: 201
+        body: '{"id": 42, "subject": "stub"}'
+        headers:
+          Content-Type: [application/json]

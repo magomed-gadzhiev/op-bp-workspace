@@ -1,0 +1,67 @@
+# Витрина моделирования БП (дрилл 2, спека 163): согласование договора
+# через несколько отделов — скрипты, документы, каталог, команда экземпляра,
+# орг-маршрутизация руководителя, naming, приоритеты, табличный режим.
+description: >-
+  <p>Согласование договора через несколько отделов. Инициатор регистрирует
+  договор (номер, контрагент, предмет, сумма, тип, подразделение); документы
+  заявки создаёт стартовый скрипт. Далее ступени: юридический отдел,
+  финансовый отдел, служба безопасности; утверждение руководителем
+  подразделения (орг-маршрутизация, фолбэк — группа); итог возвращается
+  инициатору. Согласующие могут возвращать договор на доработку; инициатору и
+  руководителю доступна команда «Вернуть на доработку» с формой.</p>
+document_template_refs:
+- Карточка договора
+- Лист согласования
+- Доработка договора
+instance_visibility: default
+instance_script_bindings:
+- script_name: create_docs
+instance_commands:
+- allowed_for:
+  - role: initiator
+  - task: Утверждение руководителем
+    role: executor
+  confirm: Вернуть договор инициатору на доработку?
+  form:
+    document_template: Доработка договора
+  order: 10
+  rollback_target_task: Регистрация договора
+  slug: return_to_work
+  title: Вернуть на доработку
+initiation_config:
+  auto_start_first_task: true
+  naming:
+    enabled: true
+    prefix: Договор
+name: Согласование договора (несколько отделов)
+priority_config:
+  default: medium
+  enabled: true
+scripts:
+- code_file: scripts/create_docs.py
+  display_name: Создание документов заявки
+  name: create_docs
+- code_file: scripts/validate_contract.py
+  display_name: Проверка регистрации договора
+  name: validate_contract
+- code_file: scripts/record_legal.py
+  display_name: Фиксация заключения юр. отдела
+  name: record_legal
+- code_file: scripts/record_finance.py
+  display_name: Фиксация заключения фин. отдела
+  name: record_finance
+- code_file: scripts/record_sbo.py
+  display_name: Фиксация заключения СБ
+  name: record_sbo
+- code_file: scripts/record_decision.py
+  display_name: Решение руководителя в договор
+  name: record_decision
+- code_file: scripts/on_reject_note.py
+  display_name: Пометка о возврате на доработку
+  name: on_reject_note
+- code_file: scripts/finalize.py
+  display_name: Финализация статуса договора
+  name: finalize
+slug: qa-pdm-core-20261003-g3
+
+# пример: витрина моделирования (дрилл 2026-10-18)

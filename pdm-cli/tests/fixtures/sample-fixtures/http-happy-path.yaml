@@ -1,0 +1,16 @@
+name: happy-path
+matchers:
+  - request:
+      method: POST
+      url_matches: 'https://api\.partner\.local/v1/payments'
+      headers:
+        Content-Type: application/json
+      body_contains:
+        - '"amount":'
+    response:
+      status: 200
+      headers:
+        Content-Type: application/json
+      body: |
+        {"transaction_id": "<redacted-hex>", "status": "ok"}
+      delay_ms: 120

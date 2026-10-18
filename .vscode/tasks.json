@@ -1,0 +1,69 @@
+{
+  // Задачи-обёртки над `pdm ws` (спека 163 §5.1): менеджер не живёт в терминале.
+  // Запуск: Terminal -> Run Task… из корня клона зеркала (cwd = корень клона;
+  // workspace/<slug>/ — только каталог данных БП, команды там не исполняются).
+  // Кроссплатформенно (Linux/macOS/Windows) через uv: `uv run --env-file .env`
+  // подхватывает PDM_API_BASE/PDM_API_TOKEN — терминал и bash не нужны.
+  // Требуется: uv (README §5), pdm-cli (README §5 / scripts/uv-bootstrap.sh),
+  // .env в корне клона (README §4) — без него uv завершит задачу с ошибкой.
+  "version": "2.0.0",
+  "inputs": [
+    {
+      "id": "bpSlug",
+      "type": "promptString",
+      "description": "Слэг БП, например lem (для ws-check можно оставить пустым — проверится весь workspace)"
+    }
+  ],
+  "tasks": [
+    {
+      "label": "ws-init",
+      "detail": "Выгрузить определение БП с сервера в workspace/<slug>/",
+      "type": "shell",
+      "command": "uv",
+      "args": ["run", "--env-file", ".env", "--", "pdm", "ws", "init", "${input:bpSlug}"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": []
+    },
+    {
+      "label": "ws-check",
+      "detail": "Офлайн-валидация workspace (Tier 0), без записи на сервер",
+      "type": "shell",
+      "command": "uv",
+      "args": ["run", "--env-file", ".env", "--", "pdm", "ws", "check", "${input:bpSlug}"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": []
+    },
+    {
+      "label": "ws-test",
+      "detail": "Сохранить в тестовую версию (draft-import) + тестовый прогон; идентичный повтор — no-op",
+      "type": "shell",
+      "command": "uv",
+      "args": ["run", "--env-file", ".env", "--", "pdm", "ws", "test", "${input:bpSlug}"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": []
+    },
+    {
+      "label": "ws-test-norun",
+      "detail": "Только сохранить в тестовую версию (draft-import), без старта прогона",
+      "type": "shell",
+      "command": "uv",
+      "args": ["run", "--env-file", ".env", "--", "pdm", "ws", "test", "${input:bpSlug}", "--no-run"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": []
+    },
+    {
+      "label": "ws-report",
+      "detail": "Diff-сводка, live_impact и чек-лист применения для человека",
+      "type": "shell",
+      "command": "uv",
+      "args": ["run", "--env-file", ".env", "--", "pdm", "ws", "report", "${input:bpSlug}"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": []
+    }
+  ]
+}

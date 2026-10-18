@@ -1,0 +1,196 @@
+# Sandbox stack: Hoverfly + isolated PDM instance for replay-based testing.
+# Usage:
+#   docker compose -f docker-compose.full.yml -f tools/pdm-cli/sandbox/docker-compose.sandbox.yml up -d
+#
+# HTTPS prerequisite: ca/out/ must exist before `up`.
+# Run once: bash tools/pdm-cli/sandbox/ca/generate-ca.sh
+# Then after first up: docker compose -f docker-compose.full.yml exec pdm-backend-sandbox update-ca-certificates
+# See tools/pdm-cli/sandbox/README.md → HTTPS section for full setup instructions.
+services:
+
+  hoverfly:
+    image: spectolabs/hoverfly:v1.10.4
+    container_name: pdm_hoverfly
+    # Etap 8 Phase 2: register a remote post-serve action at boot so simulated
+    # HTTP egress can be forwarded to egress-log-writer without a manual
+    # hoverctl step. Simulation responses opt in with postServeAction=log-egress.
+    command:
+      - "-listen-on-host"
+      - "0.0.0.0"
+      - "-disable-cache"
+      - "-cert"
+      - "/certs/ca.crt"
+      - "-key"
+      - "/certs/ca.key"
+      - "-post-serve-action"
+      - "log-egress http://egress-log-writer:8910/capture 0"
+    ports:
+      - "8888:8888"   # Admin API
+      - "8500:8500"   # Proxy
+    volumes:
+      - ./tools/pdm-cli/sandbox/ca/out:/certs:ro
+    networks: [default]
+    restart: unless-stopped
+
+  egress-log-writer:
+    build:
+      context: ./tools/pdm-cli/sandbox/egress-log-writer
+    container_name: pdm_egress_log_writer
+    environment:
+      PDM_INTERNAL_API_URL: http://pdm-backend-sandbox:8000
+      PDM_INTERNAL_API_TOKEN: ${PDM_INTERNAL_API_TOKEN:-}
+      LISTEN_HOST: "0.0.0.0"
+      LISTEN_PORT: "8910"
+    depends_on:
+      - pdm-backend-sandbox
+    networks: [default]
+    restart: unless-stopped
+
+  pdm-postgres-sandbox:
+    image: pgvector/pgvector:pg16
+    container_name: pdm_postgres_sandbox
+    environment:
+      POSTGRES_DB: ${PDM_SANDBOX_DB_NAME:-pdm_sandbox_db}
+      POSTGRES_USER: ${PDM_SANDBOX_DB_USER:-pdm}
+      POSTGRES_PASSWORD: ${PDM_SANDBOX_DB_PASS:-sandbox}
+    volumes:
+      - pdm-sandbox-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PDM_SANDBOX_DB_USER:-pdm}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [default]
+    restart: unless-stopped
+
+  pdm-redis-sandbox:
+    image: redis:7-alpine
+    container_name: pdm_redis_sandbox
+    networks: [default]
+    restart: unless-stopped
+
+  pdm-backend-sandbox:
+    build:
+      context: ./pdm/backend
+      dockerfile: Dockerfile
+    container_name: pdm_backend_sandbox
+    environment:
+      POSTGRES_HOST: pdm-postgres-sandbox
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${PDM_SANDBOX_DB_NAME:-pdm_sandbox_db}
+      POSTGRES_USER: ${PDM_SANDBOX_DB_USER:-pdm}
+      POSTGRES_PASSWORD: ${PDM_SANDBOX_DB_PASS:-sandbox}
+      SECRET_KEY: ${PDM_SANDBOX_SECRET_KEY:-sandbox-dev-secret}
+      DEBUG: "True"
+      ALLOWED_HOSTS: "*"
+      CELERY_BROKER_URL: redis://pdm-redis-sandbox:6379/0
+      CELERY_RESULT_BACKEND: redis://pdm-redis-sandbox:6379/0
+      # Route ALL outgoing HTTP(S) through Hoverfly
+      HTTP_PROXY: http://hoverfly:8500
+      HTTPS_PROXY: http://hoverfly:8500
+      NO_PROXY: localhost,127.0.0.1,pdm-postgres-sandbox,pdm-redis-sandbox,pdm-egress-ssh-replay
+      PDM_SANDBOX: "true"
+      # CA trust — needed so Python requests/httpx verify Hoverfly's TLS intercept cert.
+      # After first `up`, run: docker compose -f docker-compose.full.yml exec pdm-backend-sandbox update-ca-certificates
+      REQUESTS_CA_BUNDLE: /etc/ssl/certs/ca-certificates.crt
+      SSL_CERT_FILE: /etc/ssl/certs/ca-certificates.crt
+    volumes:
+      - ./tools/pdm-cli/sandbox/ca/out/ca.crt:/usr/local/share/ca-certificates/pdm-sandbox-ca.crt:ro
+    depends_on:
+      pdm-postgres-sandbox:
+        condition: service_healthy
+      pdm-redis-sandbox:
+        condition: service_started
+      hoverfly:
+        condition: service_started
+    ports:
+      - "8001:8000"
+    networks: [default]
+    restart: unless-stopped
+
+  ssh-host-keys-init:
+    build:
+      context: ./tools/pdm-cli/sandbox/ssh-host-keys-init
+    container_name: pdm_ssh_host_keys_init
+    volumes:
+      - ssh-host-keys:/shared/host_keys
+    restart: "no"
+
+  pdm-egress-ssh-replay:
+    build:
+      context: ./tools/pdm-cli/sandbox/ssh-replay
+    container_name: pdm_ssh_replay
+    environment:
+      SSH_PORT: "22"
+      SSH_FIXTURES_DIR: /fixtures
+      SSH_HOST_KEY: /shared/host_keys/host_rsa_key
+      SSH_TARGET_HOST: ${PDM_SSH_REPLAY_TARGET_HOST:-deploy.local}
+      SSH_JOURNAL_PORT: "8889"
+      # Etap 7 Phase 3 — per-run override fixtures written by sandbox-mcp's
+      # SshOverrideContext (host-mounted, re-globbed on each SSH connection).
+      SSH_REPLAY_OVERRIDE_DIR: /var/sandbox/ssh-overrides
+    volumes:
+      - ssh-host-keys:/shared/host_keys:ro
+      - ./.pdm/ssh-replay-fixtures:/fixtures:ro
+      - ./.pdm/sandbox/ssh-overrides:/var/sandbox/ssh-overrides
+      - ./tools/pdm-cli:/work:ro
+    depends_on:
+      ssh-host-keys-init:
+        condition: service_completed_successfully
+    ports:
+      - "2222:22"
+      - "8889:8889"
+    networks:
+      default:
+        aliases:
+          - deploy.local
+          - prod.local
+    restart: unless-stopped
+
+  pdm-ssh-bastion-payroll:
+    build:
+      context: ./tools/pdm-cli/sandbox/ssh-bastion
+    container_name: pdm_ssh_bastion_payroll
+    environment:
+      SSH_PORT: "22"
+      BASTION_BP_SLUG: payroll
+      BASTION_TARGET_HOST: ${PDM_SSH_BASTION_TARGET_HOST:-}
+      BASTION_TARGET_PORT: "${PDM_SSH_BASTION_TARGET_PORT:-22}"
+      BASTION_TARGET_USER: "${PDM_SSH_BASTION_TARGET_USER:-}"
+      BASTION_FORWARD_KEY: /keys/forward_id_rsa
+      BASTION_CAPTURE_FILE: /captures/ssh-capture.jsonl
+      BASTION_REDACT_REGEX: '${PDM_SSH_BASTION_REDACT_REGEX:-["--password[= ]+\\S+","\\b[a-fA-F0-9]{32,}\\b"]}'
+    volumes:
+      - ./tools/pdm-cli/sandbox/.ssh-bastion-keys:/keys
+      - ./tools/pdm-cli/sandbox/captures:/captures
+    ports:
+      - "2223:22"
+    profiles: ["bastion"]
+    networks: [default]
+    restart: unless-stopped
+
+  pdm-ssh-bastion-deploy:
+    build:
+      context: ./tools/pdm-cli/sandbox/ssh-bastion
+    container_name: pdm_ssh_bastion_deploy
+    environment:
+      SSH_PORT: "22"
+      BASTION_BP_SLUG: deploy
+      BASTION_TARGET_HOST: ${PDM_SSH_BASTION_TARGET_HOST:-}
+      BASTION_TARGET_PORT: "${PDM_SSH_BASTION_TARGET_PORT:-22}"
+      BASTION_TARGET_USER: "${PDM_SSH_BASTION_TARGET_USER:-}"
+      BASTION_FORWARD_KEY: /keys/forward_id_rsa
+      BASTION_CAPTURE_FILE: /captures/ssh-capture.jsonl
+      BASTION_REDACT_REGEX: '${PDM_SSH_BASTION_REDACT_REGEX:-["--password[= ]+\\S+","\\b[a-fA-F0-9]{32,}\\b"]}'
+    volumes:
+      - ./tools/pdm-cli/sandbox/.ssh-bastion-keys:/keys
+      - ./tools/pdm-cli/sandbox/captures:/captures
+    ports:
+      - "2224:22"
+    profiles: ["bastion"]
+    networks: [default]
+    restart: unless-stopped
+
+volumes:
+  pdm-sandbox-pgdata:
+  ssh-host-keys:

@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "pdm-prod": {
+      "command": "pdm",
+      "args": ["mcp", "serve", "--env=prod"],
+      "cwd": "${workspaceFolder}"
+    },
+    "pdm-sandbox-readonly": {
+      "command": "pdm",
+      "args": ["mcp", "serve", "--env=sandbox"],
+      "cwd": "${workspaceFolder}"
+    },
+    "pdm-sandbox": {
+      "command": "pdm",
+      "args": ["sandbox-mcp", "serve"],
+      "cwd": "${workspaceFolder}"
+    }
+  }
+}

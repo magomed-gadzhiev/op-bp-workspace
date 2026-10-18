@@ -1,0 +1,5 @@
+captures/*
+!captures/.gitkeep
+.ssh-replay-keys/
+.ssh-bastion-keys/
+ca/out/

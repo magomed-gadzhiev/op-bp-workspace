@@ -1,0 +1,28 @@
+assign_to_starter: true
+auto_start_on_open: true
+card_fields_config:
+  Карточка договора:
+  - Номер
+  - Дата регистрации
+  - Контрагент
+  - Предмет договора
+  - Сумма
+  - Тип договора
+  - Подразделение
+  Лист согласования:
+  - Требуется согласование СБ
+documents_display_order:
+- Карточка договора
+- Лист согласования
+editable_entity_types:
+- Карточка договора
+- Лист согласования
+name: Регистрация договора
+order: 10
+readable_entity_types:
+- Карточка договора
+- Лист согласования
+script_bindings:
+- script_name: create_docs
+  script_type: on_start
+- script_name: validate_contract

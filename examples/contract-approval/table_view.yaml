@@ -1,0 +1,16 @@
+# Табличный режим (спека 076/156): колонки из документов заявки. Группы
+# reader/editor — локальные для стенда, в пакет не входят (спека 162).
+columns:
+- entity_type: Договор
+  field: Контрагент
+  title: Контрагент
+- entity_type: Договор
+  field: Сумма
+  title: Сумма
+- entity_type: Лист согласования
+  field: Решение руководителя
+  title: Решение
+default_filters: []
+default_sort: []
+enabled: true
+row_styles: {}

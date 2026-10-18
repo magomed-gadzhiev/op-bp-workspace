@@ -1,0 +1,30 @@
+auto_start_on_open: true
+card_fields_config:
+  Лист согласования:
+  - Заключение юридического отдела
+  - Требуется согласование СБ
+documents_display_order:
+- Карточка договора
+- Лист согласования
+editable_entity_types:
+- Лист согласования
+name: Согласование — юридический отдел
+order: 20
+readable_entity_types:
+- Карточка договора
+reject_target_task: Регистрация договора
+responsible_groups:
+- dogovor:legal
+script_bindings:
+- script_name: record_legal
+- script_name: on_reject_note
+  script_type: on_reject
+start_condition:
+  condition_tree:
+    condition: and
+    rules:
+    - assignment_task: Регистрация договора
+      operator: equals
+      value: completed
+watcher_groups:
+- dogovor:watchers

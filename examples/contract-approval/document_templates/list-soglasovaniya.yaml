@@ -1,0 +1,28 @@
+description: >-
+  <p>Лист прохождения согласования: заключения отделов и решение
+  руководителя. Заполняется согласующими на своих ступенях.</p>
+fields:
+- field_type: string
+  in_string_representation: true
+  name: Номер договора
+  order: 0
+- field_type: boolean
+  name: Требуется согласование СБ
+  order: 1
+- field_type: text
+  name: Заключение юридического отдела
+  order: 2
+- field_type: text
+  name: Заключение финансового отдела
+  order: 3
+- field_type: text
+  name: Заключение службы безопасности
+  order: 4
+- field_type: string
+  name: Решение руководителя
+  order: 5
+- field_type: text
+  name: Комментарий руководителя
+  order: 6
+name: Лист согласования
+system_type: document

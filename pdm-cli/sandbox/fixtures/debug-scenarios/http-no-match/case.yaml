@@ -1,0 +1,28 @@
+# Сценарий: HTTP no-match (класс 2.2 в pdm:debug-failed-run).
+#
+# Ожидание: БП делает POST на /api/v3/work_packages со специфическим
+# хедером X-Idempotency-Key. Фикстура `fixtures/http-create-wp.yaml`
+# матчит запрос БЕЗ этого хедера, поэтому Hoverfly в simulate-режиме
+# вернёт 502 на реальный запрос.
+#
+# Что должен сказать скилл:
+#   Корень: HTTP no-match. В фикстуре http-create-wp.yaml pair #1
+#   отсутствует требование/значение хедера X-Idempotency-Key; БП шлёт
+#   запрос с этим хедером, Hoverfly не находит матч → 502.
+#   Фикс: добавить хедер в request-матчер либо перезаписать фикстуру
+#   `pdm fixtures record` на свежем capture-прогоне.
+name: "Create work package — happy path"
+fixtures: [http-create-wp]
+entity:
+  type: contract
+  fields:
+    amount: 100
+    customer: "ООО Ромашка"
+timeout_sec: 60
+expect:
+  final_status: completed
+  side_effects:
+    - kind: http
+      method: POST
+      url_matches: "/api/v3/work_packages"
+      min_count: 1

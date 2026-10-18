@@ -1,0 +1,19 @@
+# Золотой кейс 3/8 (US2): новый БП с нуля — scaffold (bp_new_process) +
+# канонический справочник полей (bp_field_reference, component=catalog):
+# агент заполняет DocField по справочнику, не по памяти; compile зелёный.
+id: new-process-catalog
+title: Новый БП со справочником статусов (US2)
+servers: [read, write]
+task: |
+  Создай новый бизнес-процесс «Контроль образцов» (слэг
+  kontrol-obrazcov) с задачами «Регистрация» и «Проверка» и справочником
+  статусов образца. Поля справочника возьми из канонического справочника
+  полей пакета, не выдумывай. Добейся зелёной компиляции.
+# 16 шагов: легитимная длина цикла scaffold+справочник+правка+compile
+# (на 12 модель не успевала дойти до bp_compile — прод-прогон 07.10).
+max_steps: 16
+expect:
+  tools_any: [bp_new_process, bp_field_reference]
+  green_tools: [bp_compile]
+  max_green_iterations: 3
+  grounding: true

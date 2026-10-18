@@ -1,0 +1,8 @@
+fields:
+- name: id
+  type: int
+- name: full_name
+  type: str
+name: Employee
+slug: employee
+validation: {}

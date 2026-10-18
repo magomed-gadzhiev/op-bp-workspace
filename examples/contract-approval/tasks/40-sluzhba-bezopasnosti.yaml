@@ -1,0 +1,29 @@
+auto_start_on_open: true
+card_fields_config:
+  Лист согласования:
+  - Заключение службы безопасности
+documents_display_order:
+- Карточка договора
+- Лист согласования
+editable_entity_types:
+- Лист согласования
+name: Согласование — служба безопасности
+order: 40
+readable_entity_types:
+- Карточка договора
+reject_target_task: Регистрация договора
+responsible_groups:
+- dogovor:sbo
+script_bindings:
+- script_name: record_sbo
+- script_name: on_reject_note
+  script_type: on_reject
+start_condition:
+  condition_tree:
+    condition: and
+    rules:
+    - assignment_task: Согласование — финансовый отдел
+      operator: equals
+      value: completed
+watcher_groups:
+- dogovor:watchers

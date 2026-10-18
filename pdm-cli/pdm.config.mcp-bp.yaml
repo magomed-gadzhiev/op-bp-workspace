@@ -1,0 +1,14 @@
+# pdm.config.yaml контейнера mcp-pdm-bp (спека 142, волна B).
+#
+# Запекается в образ как /work/pdm.config.yaml: верба bp_test гоняет кейсы
+# движком `pdm test` против sandbox-стека (ADR-0058 п.3). Контейнер сидит в
+# сети проекта стенда — адреса сервисов по DNS-именам, а не localhost:PORT
+# (порты публикуются для хоста). ТОЛЬКО топология, БЕЗ секретов: ключ
+# sandbox-PDM приходит через env PDM_API_KEY_SANDBOX или смонтированный
+# .pdm/secrets.yaml (api_key_sandbox) — резолюция как у host-CLI
+# (pdm_cli/config.py).
+endpoints:
+  sandbox: http://pdm-backend-sandbox:8000
+hoverfly_admin: http://hoverfly:8888
+ssh_replay_journal: http://pdm-egress-ssh-replay:8889
+sandbox_db_dsn: postgresql://pdm:sandbox@pdm-postgres-sandbox:5432/pdm_sandbox_db

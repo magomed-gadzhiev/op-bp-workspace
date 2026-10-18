@@ -1,0 +1,5 @@
+sheet = process.get_document('Лист согласования')
+contract = process.get_document("Карточка договора")
+contract.set('Статус согласования', sheet.get('Решение руководителя'))
+contract.save()
+log('Маршрут завершён. Статус договора: ' + str(sheet.get('Решение руководителя')))

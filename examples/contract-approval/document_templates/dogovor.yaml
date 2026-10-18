@@ -1,0 +1,35 @@
+description: >-
+  <p>Карточка договора: реквизиты и статус согласования. Создаётся
+  стартовым скриптом, заполняется инициатором на регистрации.</p>
+fields:
+- field_type: string
+  in_string_representation: true
+  name: Номер
+  order: 0
+- field_type: date
+  name: Дата регистрации
+  order: 1
+- field_type: string
+  name: Контрагент
+  order: 2
+- field_type: text
+  name: Предмет договора
+  order: 3
+- field_type: decimal
+  name: Сумма
+  order: 4
+- field_type: catalog_reference
+  name: Тип договора
+  order: 5
+  properties:
+    ui:
+      widget: radio
+  reference_catalog: Тип договора
+- field_type: org_unit
+  name: Подразделение
+  order: 6
+- field_type: string
+  name: Статус согласования
+  order: 7
+name: Карточка договора
+system_type: document

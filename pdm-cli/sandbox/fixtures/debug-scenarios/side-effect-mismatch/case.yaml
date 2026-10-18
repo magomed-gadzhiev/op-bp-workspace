@@ -1,0 +1,28 @@
+# Сценарий: Side-effect assertion mismatch (класс 2.5).
+#
+# БП завершается successfully (final_status: completed), но ожидаемый
+# POST на /api/v3/work_packages НЕ выполняется — потому что в БП
+# ветка `if entity.amount > 1000` (порог), а в нашем кейсе amount=100.
+# `assertions[].status: failed` для side-effect kind=http.
+#
+# Что должен сказать скилл:
+#   Корень: Side-effect mismatch — БП реально не сделал ожидаемый POST
+#   (Hoverfly journal пуст для /api/v3/work_packages). Развилка:
+#   а) баг в БП (условие amount > 1000 ошибочно — должно быть >= 100);
+#   б) баг в case.yaml (entity.amount должно быть > 1000).
+#   Уточнить у владельца БП, какое поведение корректно.
+name: "Auto-create work package on contract create"
+fixtures: [http-create-wp]
+entity:
+  type: contract
+  fields:
+    amount: 100              # ← мал; БП не создаёт WP
+    customer: "ООО Малыш"
+timeout_sec: 60
+expect:
+  final_status: completed
+  side_effects:
+    - kind: http
+      method: POST
+      url_matches: "/api/v3/work_packages"
+      min_count: 1           # ← ассертит, что вызов был, а его нет
