@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pdm-cli"
-version = "0.13.0"
+version = "0.13.1"
 description = "CLI for managing PDM business processes via git (vibe-coding)"
 requires-python = ">=3.11"
 dependencies = [
@@ -27,6 +27,8 @@ dev = [
     "paramiko>=3.4,<4.0",
     "responses>=0.25",
     "pytest-httpserver>=1.0",
+    # сборка колеса в тесте упаковки — без network-isolation
+    "hatchling>=1.25",
 ]
 mcp = ["mcp>=1.0.0,<2"]  # v2 переименовал FastMCP → MCPServer (ломает mcp/, sandbox_mcp/, defmcp/)
 
@@ -35,9 +37,6 @@ pdm = "pdm_cli.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pdm_cli"]
-
-[tool.hatch.build.targets.wheel.force-include]
-"src/pdm_cli/templates/skills" = "pdm_cli/templates/skills"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
