@@ -14,7 +14,7 @@ import click
 from rich.console import Console
 
 from ..api_client import PdmApiClient
-from ..config import Config, load_config
+from ..config import Config, ConfigError, load_config
 
 console = Console()
 
@@ -33,9 +33,20 @@ def make_client(ctx, api_base: str | None, api_key: str | None) -> PdmApiClient:
     key = api_key or os.environ.get("PDM_API_TOKEN")
     if base and key:
         return PdmApiClient(base_url=base, api_key=key, timeout=120.0)
-    # Fallback: pdm.config.yaml (client-project репо)
+    # Fallback: pdm.config.yaml (client-project репо). В воркспейсе БП его
+    # нет и не нужно — подключение живёт в .env; без него сообщение должно
+    # вести к .env, а не к файлу, о котором пользователь воркспейса не знает.
     cwd = Path((ctx.obj or {}).get("cwd") or ".")
-    cfg: Config = load_config(cwd)
+    try:
+        cfg: Config = load_config(cwd)
+    except ConfigError as e:
+        raise click.ClickException(
+            "PDM не подключён: не заданы PDM_API_BASE/PDM_API_TOKEN, "
+            f"и pdm.config.yaml не найден ({e}).\n"
+            "В воркспейсе БП подключение — в .env в корне клона: задачи "
+            "VS Code (ws-init/ws-check/…) подставляют его сами, либо "
+            "запускайте команду так: uv run --env-file .env -- pdm ws …"
+        ) from e
     env = "sandbox"
     return PdmApiClient(
         base_url=cfg.endpoint(env),

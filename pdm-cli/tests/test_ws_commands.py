@@ -76,6 +76,50 @@ VERSIONS = {
 }
 
 
+# ── ws list ───────────────────────────────────────────────────────────────────
+
+@respx.mock
+def test_ws_list_prints_slugs(tmp_path, monkeypatch):
+    _seed_env(monkeypatch)
+    respx.get(f"{API}/api/business-processes/").respond(json=[
+        {"id": 12, "slug": "soglasovanie-dogovora", "name": "Согласование договора"},
+        {"id": 7, "slug": "lem", "name": "ЛЭМ"},
+    ])
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["ws", "list"], obj={"cwd": tmp_path})
+    assert result.exit_code == 0, result.output
+    assert "soglasovanie-dogovora" in result.output
+    assert "Согласование договора" in result.output
+    assert "id=12" in result.output
+    assert "Всего 2" in result.output
+
+
+@respx.mock
+def test_ws_list_401_hints_token(tmp_path, monkeypatch):
+    _seed_env(monkeypatch)
+    respx.get(f"{API}/api/business-processes/").respond(status_code=401)
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["ws", "list"], obj={"cwd": tmp_path})
+    assert result.exit_code == 1
+    assert "PDM_API_TOKEN" in result.output
+
+
+@respx.mock
+def test_ws_command_without_env_hints_dotenv(tmp_path, monkeypatch):
+    """Нет env и нет pdm.config.yaml → подсказка про .env, не ConfigError."""
+    monkeypatch.delenv("PDM_API_BASE", raising=False)
+    monkeypatch.delenv("PDM_API_TOKEN", raising=False)
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["ws", "list"], obj={"cwd": tmp_path})
+    assert result.exit_code == 1
+    assert "PDM не подключён" in result.output
+    assert ".env" in result.output
+    assert "uv run --env-file .env" in result.output
+
+
 # ── ws init ───────────────────────────────────────────────────────────────────
 
 @respx.mock

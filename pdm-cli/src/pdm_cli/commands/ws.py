@@ -147,6 +147,43 @@ def ws():
     """
 
 
+@ws.command("list")
+@api_options
+@click.pass_context
+def ws_list(ctx, api_base, api_key):
+    """Доступные БП: slug, название, id — источник слэга для ws init."""
+    with make_client(ctx, api_base, api_key) as client:
+        try:
+            procs = client.list_processes()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 401:
+                console.print(
+                    "[red]401: токен не принят — проверь PDM_API_TOKEN в "
+                    ".env (PAT из профиля PDM).[/red]"
+                )
+            else:
+                console.print(f"[red]список БП не удался: {_server_error(e)}[/red]")
+            sys.exit(1)
+        except httpx.HTTPError as e:
+            console.print(f"[red]список БП не удался: {e}[/red]")
+            sys.exit(1)
+    if not procs:
+        console.print("[yellow]На сервере нет ни одного БП.[/yellow]")
+        return
+    width = max(len(p.get("slug") or "") for p in procs)
+    for p in procs:
+        slug = p.get("slug") or ""
+        console.print(
+            f"  [cyan]{slug.ljust(width)}[/cyan]  {p.get('name') or '—'}  "
+            f"[dim](id={p.get('id')})[/dim]"
+        )
+    console.print(
+        f"\nВсего {len(procs)}. Выгрузка БП: "
+        "[cyan]pdm ws init <slug>[/cyan] (слэг — вторая колонка не нужна, "
+        "копируй первый токен строки)."
+    )
+
+
 @ws.command("init")
 @click.argument("slug")
 @api_options
