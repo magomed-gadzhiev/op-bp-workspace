@@ -51,8 +51,14 @@ class PdmApiClient:
 
         DRF ``ConfigurablePageNumberPagination`` defaults to 20/page. Without
         following ``next``, find_bp_pk / slug-collision checks miss later pages.
+        ``next`` не берётся дословно: сервер строит абсолютный URL без префикса
+        маунта ( srv-dkr-01/api/... вместо srv-dkr-01/pdm/api/...), страница 2
+        давала 404 (дрилл 2026-10-19). Переносим только query-параметры
+        (page, slug, …) на наш базовый путь.
         """
         collected: list[dict] = []
+        from urllib.parse import urlparse
+
         url: str | None = "/api/business-processes/"
         seen: set[str] = set()
         for _ in range(100):
@@ -64,7 +70,12 @@ class PdmApiClient:
             data = r.json()
             if isinstance(data, dict) and "results" in data:
                 collected.extend(data["results"])
-                url = data.get("next") or None
+                nxt = data.get("next")
+                if not nxt:
+                    url = None
+                else:
+                    query = urlparse(nxt).query
+                    url = "/api/business-processes/" + (f"?{query}" if query else "")
             else:
                 return data
         return collected

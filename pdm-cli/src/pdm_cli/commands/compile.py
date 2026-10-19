@@ -24,28 +24,21 @@ from ..bpm_package import (
 console = Console()
 
 
-@click.command("compile")
-@click.option("--bp", "bp_slug", default=None,
-              help="Только этот БП (по умолчанию все процессы из processes/).")
-@click.option("--out", "out_dir", default=None, type=click.Path(),
-              help="Каталог для выгрузки собранных zip (опционально).")
-@click.pass_context
-def compile_cmd(ctx, bp_slug, out_dir):
-    """Собрать и провалидировать локальный YAML-пакет БП (Tier 0)."""
-    cwd = Path((ctx.obj or {}).get("cwd") or ".")
-    slugs = [bp_slug] if bp_slug else list_package_slugs(cwd)
-
-    if bp_slug and not (cwd / "processes" / bp_slug / "process.yaml").is_file():
-        console.print(f"[red]process.yaml не найден: processes/{bp_slug}/[/red]")
-        sys.exit(2)
-    if not slugs:
-        console.print("[yellow]Пакетных БП нет (processes/<slug>/process.yaml).[/yellow]")
-        return
-
+def tier0_check(
+    cwd: Path,
+    slugs: list[str],
+    *,
+    definitions_root: Path | None = None,
+    out_dir: Path | None = None,
+) -> int:
+    """Общий движок Tier 0 (pdm compile и pdm ws check, спека 163 §4.2):
+    чтение + офлайн-валидация пакетов, ноль сети. Возвращает число
+    пакетов с ошибками; печать — по одному пакету, итог только на успехе.
+    """
     failures = 0
     for slug in slugs:
         try:
-            pkg = read_package(cwd, slug)
+            pkg = read_package(cwd, slug, definitions_root=definitions_root)
         except Exception as e:  # pydantic/IO — любая ошибка читается как есть
             console.print(f"[red]{slug}: чтение не удалось: {e}[/red]")
             failures += 1
@@ -71,7 +64,30 @@ def compile_cmd(ctx, bp_slug, out_dir):
             console.print(f"    → {out / fname} ({len(data)} b)")
 
     if failures:
-        sys.exit(1)
+        return failures
     summary = Table(show_header=False, box=None)
     summary.add_row(f"Tier 0 пройден: {len(slugs)} БП, ошибок {failures}")
     console.print(summary)
+    return failures
+
+
+@click.command("compile")
+@click.option("--bp", "bp_slug", default=None,
+              help="Только этот БП (по умолчанию все процессы из processes/).")
+@click.option("--out", "out_dir", default=None, type=click.Path(),
+              help="Каталог для выгрузки собранных zip (опционально).")
+@click.pass_context
+def compile_cmd(ctx, bp_slug, out_dir):
+    """Собрать и провалидировать локальный YAML-пакет БП (Tier 0)."""
+    cwd = Path((ctx.obj or {}).get("cwd") or ".")
+    slugs = [bp_slug] if bp_slug else list_package_slugs(cwd)
+
+    if bp_slug and not (cwd / "processes" / bp_slug / "process.yaml").is_file():
+        console.print(f"[red]process.yaml не найден: processes/{bp_slug}/[/red]")
+        sys.exit(2)
+    if not slugs:
+        console.print("[yellow]Пакетных БП нет (processes/<slug>/process.yaml).[/yellow]")
+        return
+
+    if tier0_check(cwd, slugs, out_dir=Path(out_dir) if out_dir else None):
+        sys.exit(1)

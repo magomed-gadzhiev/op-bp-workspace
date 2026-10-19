@@ -248,6 +248,11 @@ class PkgBusinessProcess(_Sparse):
     priority_config: dict[str, Any] = Field(default_factory=dict)
     admin_users: list[str] = Field(default_factory=list)
     allowed_starter_groups: list[str] = Field(default_factory=list)
+    # Политика прав (спека 162 / ADR-0069): local — субъекты доступа стенда
+    # локальны для него, в ZIP не едут и импортом не применяются (дефолт:
+    # старые каталоги без поля = local); portable — прежний полный перенос.
+    # При local drift не сверяет поля прав, иначе вечный дрейф.
+    access_policy: Literal["local", "portable"] = "local"
     # Изоляция экземпляров (спека 149, ADR-0062): в isolated члены групп
     # запуска видят только созданные ими экземпляры. Инвариант (проверяется
     # сервером): isolated требует непустых allowed_starter_groups.
@@ -265,8 +270,12 @@ class PkgBusinessProcess(_Sparse):
     def _isolated_requires_starters(self) -> "PkgBusinessProcess":
         # Спека 149 (D4): изоляция без групп запуска не действует — старт открыт
         # всем, мишень правила пуста. Зеркалит 400 сериализатора БП и проверку
-        # серверного draft-импорта.
-        if self.instance_visibility == "isolated" and not self.allowed_starter_groups:
+        # серверного draft-импорта. Спека 162 п.3: при access_policy=local
+        # каталог групп не несёт — валидатор не блокирует (о пустых группах
+        # старта предупреждает серверный preview); portable — блокирует.
+        if (self.instance_visibility == "isolated"
+                and self.access_policy == "portable"
+                and not self.allowed_starter_groups):
             raise ValueError(
                 "instance_visibility=isolated требует непустых "
                 "allowed_starter_groups"
@@ -757,10 +766,37 @@ def _key_named_lists(node: Any) -> Any:
     return node
 
 
+# Поля прав доступа (спека 162 / ADR-0069): при access_policy=local сервер их
+# не экспортирует и не применяет — drift обязан исключить их из сравнения.
+_ACCESS_FIELDS_BP = ("admin_users", "allowed_starter_groups")
+_ACCESS_FIELDS_TASK = ("responsible", "responsible_groups", "watchers", "watcher_groups")
+
+
+def _strip_access_fields(bp: dict[str, Any]) -> dict[str, Any]:
+    """Убрать поля прав из канонической формы БП (local-политика)."""
+    bp = {k: v for k, v in bp.items() if k not in _ACCESS_FIELDS_BP}
+    tasks = bp.get("tasks")
+    if isinstance(tasks, list):
+        bp["tasks"] = [
+            {k: v for k, v in t.items() if k not in _ACCESS_FIELDS_TASK}
+            if isinstance(t, dict) else t
+            for t in tasks
+        ]
+    return bp
+
+
 def packages_to_compare(pkg: BpPackage) -> dict[str, Any]:
-    """Каноническое представление для сверки (спарсиво, именовано)."""
+    """Каноническое представление для сверки (спарсиво, именовано).
+
+    При access_policy=local поля прав исключаются: сервер их не экспортирует
+    (спека 162), а их присутствие в git-каталоге — настройка стенда-источника,
+    не дрейф определения.
+    """
+    bp = _canonical(pkg.business_process)
+    if pkg.business_process.access_policy == "local":
+        bp = _strip_access_fields(bp)
     return _key_named_lists({
-        "business_process": _canonical(pkg.business_process),
+        "business_process": bp,
         "document_templates": {t.name: _canonical(t) for t in pkg.document_templates},
         "catalogs": {c.name: _canonical(c) for c in pkg.catalogs},
         "table_sections": {s.name: _canonical(s) for s in pkg.table_sections},

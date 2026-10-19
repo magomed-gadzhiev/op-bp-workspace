@@ -29,12 +29,19 @@ def _seed_workspace(tmp_path, monkeypatch):
     _seed_env(monkeypatch)
 
 
-def _mock_export(slug="testbp", bp_id=1):
+def _mock_versions(payload=None, status_code=200):
+    return respx.get(f"{API}/api/business-processes/testbp/versions/").respond(
+        json=payload if payload is not None else VERSIONS,
+        status_code=status_code,
+    )
+
+
+def _mock_export(slug="testbp", bp_id=1, pkg=None):
     respx.get(f"{API}/api/business-processes/").respond(
         json=[{"id": bp_id, "slug": slug, "name": "Тестовый БП"}],
     )
-    data, _ = build_zip(make_package())
-    respx.post(f"{API}/api/business-processes/{bp_id}/export/").respond(
+    data, _ = build_zip(pkg if pkg is not None else make_package())
+    return respx.post(f"{API}/api/business-processes/{bp_id}/export/").respond(
         content=data,
     )
 
@@ -74,6 +81,7 @@ VERSIONS = {
 @respx.mock
 def test_ws_init_unpacks_export_to_workspace(tmp_path, monkeypatch):
     _seed_workspace(tmp_path, monkeypatch)  # env + перезапишется ниже
+    _mock_versions()
     _mock_export()
 
     runner = CliRunner()
@@ -87,12 +95,89 @@ def test_ws_init_unpacks_export_to_workspace(tmp_path, monkeypatch):
 
 
 @respx.mock
+def test_ws_init_prefers_testing_version(tmp_path, monkeypatch):
+    """Живая testing-версия → экспортируется её поколение, не published.
+
+    Иначе воркспейс стартовал бы с published и следующий draft-import
+    молча откатил бы несохранённые в published правки (кейс БП 12 из
+    слабомодельного прогона 2026-10-19: diff показывал 5 задач, ws init
+    выгружал 0).
+    """
+    _seed_env(monkeypatch)
+    _mock_versions()  # VERSIONS: testing №5, published №4
+    export = _mock_export()
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["ws", "init", "testbp"], obj={"cwd": tmp_path})
+    assert result.exit_code == 0, result.output
+    assert "version=5" in str(export.calls.last.request.url)
+    assert "testing-версия №5" in result.output
+
+
+@respx.mock
+def test_ws_init_no_testing_exports_published(tmp_path, monkeypatch):
+    _seed_env(monkeypatch)
+    _mock_versions(payload={
+        "process": {"id": 1, "slug": "testbp", "name": "Тестовый БП"},
+        "versions": [{"id": 40, "number": 4, "status": "published"}],
+        "testing": None, "published": {"number": 4}, "diff": None,
+    })
+    export = _mock_export()
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["ws", "init", "testbp"], obj={"cwd": tmp_path})
+    assert result.exit_code == 0, result.output
+    assert "version=" not in str(export.calls.last.request.url)
+    assert "testing-версия №" not in result.output
+
+
+@respx.mock
+def test_ws_init_versions_unavailable_falls_back(tmp_path, monkeypatch):
+    """Старый сервер без /versions/ (404) — warning и прежний behaviour."""
+    _seed_env(monkeypatch)
+    _mock_versions(status_code=404)
+    export = _mock_export()
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["ws", "init", "testbp"], obj={"cwd": tmp_path})
+    assert result.exit_code == 0, result.output
+    assert "Реестр версий недоступен" in result.output
+    assert "version=" not in str(export.calls.last.request.url)
+
+
+@respx.mock
+def test_ws_init_no_versions_at_all_exits_2(tmp_path, monkeypatch):
+    _seed_env(monkeypatch)
+    _mock_versions(payload={
+        "process": {"id": 1, "slug": "testbp", "name": "Тестовый БП"},
+        "versions": [], "testing": None, "published": None, "diff": None,
+    })
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["ws", "init", "testbp"], obj={"cwd": tmp_path})
+    assert result.exit_code == 2
+    assert "нет ни одной сохранённой версии" in result.output
+    assert not (tmp_path / "workspace" / "testbp").exists()
+
+
+@respx.mock
+def test_ws_init_empty_package_warns(tmp_path, monkeypatch):
+    _seed_env(monkeypatch)
+    _mock_versions()
+    pkg = make_package()
+    pkg.business_process.tasks = []
+    _mock_export(pkg=pkg)
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["ws", "init", "testbp"], obj={"cwd": tmp_path})
+    assert result.exit_code == 0, result.output
+    assert "В пакете 0 задач" in result.output
+
+
+@respx.mock
 def test_ws_init_403_reports_admin_rights(tmp_path, monkeypatch):
     _seed_env(monkeypatch)
-    respx.get(f"{API}/api/business-processes/").respond(
-        json=[{"id": 1, "slug": "testbp"}],
-    )
-    respx.post(f"{API}/api/business-processes/1/export/").respond(status_code=403)
+    _mock_versions(status_code=403)
 
     runner = CliRunner()
     result = runner.invoke(main, ["ws", "init", "testbp"], obj={"cwd": tmp_path})
@@ -383,6 +468,7 @@ def test_ws_report_403_reports_admin_rights(tmp_path, monkeypatch):
 @respx.mock
 def test_ws_init_writes_origin_snapshot(tmp_path, monkeypatch):
     _seed_workspace(tmp_path, monkeypatch)  # env + перезапишется ниже
+    _mock_versions()
     _mock_export()
 
     runner = CliRunner()

@@ -11,7 +11,11 @@ def test_cli_help_runs():
 
 
 def test_cli_version():
+    # Версия — из метаданных пакета (pyproject), совпадает с pdm --version
+    # установленной сборки; исходниковый чекаут — 0.0.0+source.
+    from pdm_cli import __version__
+
     runner = CliRunner()
     result = runner.invoke(main, ["--version"])
     assert result.exit_code == 0
-    assert "0.1.0" in result.output
+    assert __version__ in result.output

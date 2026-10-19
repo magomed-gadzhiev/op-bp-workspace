@@ -154,9 +154,40 @@ def ws():
 def ws_init(ctx, slug, api_base, api_key):
     """Экспорт ZIP БП SLUG → workspace/SLUG/ (офлайн-правки)."""
     cwd = Path((ctx.obj or {}).get("cwd") or ".")
+    # Экспортируется последнее сохранённое состояние: testing-версия, если
+    # она есть, иначе published. Экспорт published при живой testing молча
+    # откатил бы её правки следующим draft-import (тот заменяет testing).
+    version = None
     with make_client(ctx, api_base, api_key) as client:
         try:
-            data = client.export_package(slug)
+            registry = client.bp_versions(slug)
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 403:
+                _bp_admin_error(slug)
+                sys.exit(1)
+            console.print(
+                f"[yellow]Реестр версий недоступен ({_server_error(e)}) — "
+                "экспортирую действующее (published) определение.[/yellow]"
+            )
+        except httpx.HTTPError as e:
+            console.print(
+                f"[yellow]Реестр версий недоступен ({e}) — экспортирую "
+                "действующее (published) определение.[/yellow]"
+            )
+        else:
+            testing = registry.get("testing")
+            if testing:
+                version = testing.get("number")
+            elif not (registry.get("versions") or registry.get("published")):
+                console.print(
+                    f"[red]У БП {slug} нет ни одной сохранённой версии — "
+                    "экспортировать нечего.[/red]\n"
+                    "Первое определение создаётся в PDM UI или импортом; "
+                    "воркспейс продолжает работу с уже сохранёнными БП."
+                )
+                sys.exit(2)
+        try:
+            data = client.export_package(slug, version=version)
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 403:
                 _bp_admin_error(slug)
@@ -180,6 +211,17 @@ def ws_init(ctx, slug, api_base, api_key):
         f"шаблонов {len(pkg.document_templates)}, "
         f"справочников {len(pkg.catalogs)})"
     )
+    if version is not None:
+        console.print(
+            f"  взята testing-версия №{version} — последнее сохранённое "
+            "состояние; действующая (published) версия не менялась."
+        )
+    if not bp.tasks:
+        console.print(
+            "[yellow]⚠ В пакете 0 задач. Если это неожиданно — версии БП "
+            f"видны в [cyan]pdm ws report {slug}[/cyan] или во вкладке "
+            "версий в PDM UI.[/yellow]"
+        )
     console.print(
         "Дальше: правь YAML → [cyan]pdm ws check[/cyan] → "
         f"[cyan]pdm ws test {slug}[/cyan]"

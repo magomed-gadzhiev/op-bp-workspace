@@ -264,6 +264,31 @@ def test_validate_clean_package():
     assert validate_package(make_package()) == []
 
 
+def test_org_unit_field_round_trip_and_validate(tmp_path: Path):
+    """org_unit (спека 161): тип и свойства (unit_filter/default_source) проходят
+    компиляцию и валидацию без правок модели — проверяется, что CLI их не режет."""
+    pkg = make_package()
+    pkg.document_templates[0].fields.append(DocField(
+        name="Подразделение", field_type="org_unit", order=2, required=True,
+        properties={
+            "default_source": "author_primary_unit",
+            "unit_filter": {"tags": ["Лаборатории"]},
+        },
+    ))
+    assert validate_package(pkg) == []
+
+    write_package(tmp_path, pkg)
+    read = read_package(tmp_path, "testbp")
+    f = next(x for x in read.document_templates[0].fields if x.name == "Подразделение")
+    assert f.field_type == "org_unit"
+    assert f.properties["default_source"] == "author_primary_unit"
+    assert f.properties["unit_filter"] == {"tags": ["Лаборатории"]}
+    assert validate_package(read) == []
+
+    data, _ = build_zip(read)
+    assert not diff_packages(parse_package_zip(data), read)
+
+
 def test_diff_detects_both_directions():
     local = make_package()
     remote = make_package()
@@ -373,10 +398,20 @@ class TestInstanceVisibility:
         pkg = PkgBusinessProcess(slug="x", name="X")
         assert pkg.instance_visibility == "default"
 
-    def test_isolated_requires_starter_groups(self):
+    def test_isolated_local_without_starters_ok(self):
+        """Спека 162 п.3: local-каталог групп запуска не несёт — валидатор
+        не блокирует (пакет не должен стать запретом самой политики)."""
+        pkg = PkgBusinessProcess(
+            slug="x", name="X", instance_visibility="isolated",
+        )
+        assert pkg.instance_visibility == "isolated"
+        assert pkg.allowed_starter_groups == []
+
+    def test_isolated_portable_requires_starter_groups(self):
         with pytest.raises(ValidationError):
             PkgBusinessProcess(
                 slug="x", name="X", instance_visibility="isolated",
+                access_policy="portable",
             )
 
     def test_isolated_with_starters_ok(self):
@@ -573,3 +608,92 @@ class TestInstanceCommands:
         remote3.business_process.instance_commands[0].confirm = "Другой текст?"
         lines = diff_packages(local, remote3)
         assert any("instance_commands.add_works.confirm" in ln for ln in lines)
+
+
+# ---------------------------------------------------------------------------
+# Спека 162 / ADR-0069: access_policy local|portable
+# ---------------------------------------------------------------------------
+
+class TestAccessPolicy:
+    def test_default_is_local(self):
+        """Старые process.yaml без поля трактуются как local."""
+        bp = PkgBusinessProcess(slug="s", name="БП")
+        assert bp.access_policy == "local"
+
+    def test_invalid_value_rejected(self):
+        with pytest.raises(ValidationError):
+            PkgBusinessProcess(slug="s", name="БП", access_policy="wrong")
+
+    def test_roundtrip_preserves_portable(self, tmp_path: Path):
+        pkg = make_package()
+        pkg.business_process.access_policy = "portable"
+        write_package(tmp_path, pkg)
+        read = read_package(tmp_path, "testbp")
+        assert read.business_process.access_policy == "portable"
+
+    def test_sparse_yaml_omits_local_default(self, tmp_path: Path):
+        pkg = make_package()
+        write_package(tmp_path, pkg)
+        proc = yaml.safe_load((tmp_path / "processes/testbp/process.yaml").read_text())
+        assert "access_policy" not in proc  # local = дефолт, не пишется
+
+
+def _access_package(policy: str | None) -> BpPackage:
+    """Пакет с правами у БП и задач (git-форма: полная модель)."""
+    bp_kwargs: dict = {}
+    if policy is not None:
+        bp_kwargs["access_policy"] = policy
+    return BpPackage(
+        business_process=PkgBusinessProcess(
+            slug="accessbp",
+            name="БП с правами",
+            admin_users=["admin1"],
+            allowed_starter_groups=["starters"],
+            tasks=[
+                PkgTask(name="T1", order=1, responsible="exec",
+                        responsible_groups=["doers"], watchers=["w"],
+                        watcher_groups=["watchers"]),
+            ],
+            **bp_kwargs,
+        ),
+    )
+
+
+def _access_stripped(pkg: BpPackage) -> BpPackage:
+    """Серверный local-экспорт: прав в ZIP нет вовсе."""
+    out = _access_package(None)
+    out.business_process.admin_users = []
+    out.business_process.allowed_starter_groups = []
+    out.business_process.access_policy = pkg.business_process.access_policy
+    t = out.business_process.tasks[0]
+    t.responsible = None
+    t.responsible_groups = []
+    t.watchers = []
+    t.watcher_groups = []
+    return out
+
+
+class TestAccessPolicyDrift:
+    def test_local_drift_ignores_access_fields(self):
+        """local: права не переносятся — вечный дрейф по ним не возникает."""
+        local = _access_package("local")
+        remote = _access_stripped(local)
+        assert diff_packages(local, remote) == []
+
+    def test_default_local_drift_ignores_access_fields(self):
+        """Каталог без access_policy (= local) тоже не дрейфует по правам:
+        серверный local-экспорт несёт политику явно, git — по умолчанию;
+        sparse сворачивает обе стороны в отсутствие ключа."""
+        local = _access_package(None)
+        remote = _access_stripped(local)
+        remote.business_process.access_policy = "local"
+        assert diff_packages(local, remote) == []
+
+    def test_portable_drift_sees_access_fields(self):
+        local = _access_package("portable")
+        remote = _access_package("portable")
+        remote.business_process.admin_users = []
+        remote.business_process.tasks[0].responsible = None
+        lines = diff_packages(local, remote)
+        assert any("admin_users" in ln for ln in lines)
+        assert any("responsible" in ln for ln in lines)
