@@ -30,6 +30,8 @@ from ..bpm_package import (
 from ..test_runner.runner import TERMINAL_STATUSES
 from .common import api_options, make_client
 from .compile import tier0_check
+from .ws_findings import findings as _findings_group
+from .ws_forms import forms as _forms_group
 
 console = Console()
 
@@ -140,11 +142,16 @@ def _read_input_json(path: str | None) -> dict:
 
 @click.group("ws")
 def ws():
-    """Воркспейс БП: init/check/test/report (спека 163, ADR-0070).
+    """Воркспейс БП: init/check/test/report/findings (спека 163, ADR-0070).
 
     Рабочий каталог — workspace/<slug>/; применение тестовой версии —
-    всегда человек в PDM UI.
+    всегда человек в PDM UI. `findings` — замечания по инструменту
+    (спека 166, ADR-0073).
     """
+
+
+ws.add_command(_findings_group)
+ws.add_command(_forms_group)
 
 
 @ws.command("list")

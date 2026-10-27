@@ -208,6 +208,45 @@ class PdmApiClient:
         r.raise_for_status()
         return r.json()
 
+    # ---- Замечания по инструменту (спека 166, ADR-0073) ----
+
+    def submit_feedback(self, payload: dict) -> tuple[int, dict]:
+        """POST /api/feedbacks/submit/ → (status_code, body).
+
+        Не бросает на 4xx: CLI сам объясняет 401/409/422/429.
+        """
+        r = self._client.post("/api/feedbacks/submit/", json=payload)
+        try:
+            body = r.json()
+        except ValueError:
+            body = {"detail": r.text[:500]}
+        return r.status_code, body
+
+    def list_feedback(self, params: dict | None = None) -> list[dict]:
+        """GET /api/feedbacks/ с пагинацией (next — только query-параметры)."""
+        from urllib.parse import urlencode, urlparse
+
+        collected: list[dict] = []
+        query = urlencode(
+            {k: v for k, v in (params or {}).items() if v is not None})
+        url = "/api/feedbacks/" + (f"?{query}" if query else "")
+        seen: set[str] = set()
+        for _ in range(100):
+            if not url or url in seen:
+                break
+            seen.add(url)
+            r = self._client.get(url)
+            r.raise_for_status()
+            data = r.json()
+            if isinstance(data, dict) and "results" in data:
+                collected.extend(data["results"])
+                nxt = data.get("next")
+                url = ("/api/feedbacks/?" + urlparse(nxt).query
+                       if nxt else None)
+            else:
+                return data
+        return collected
+
     # ---- Верификационные decks (Волна 1, ADR-0012) ----
 
     def decks_import(self, decks: list[dict], *, confirm: bool = True) -> dict:
@@ -313,6 +352,34 @@ class PdmApiClient:
             "/api/admin/processes/script/validate-syntax/",
             json={"code": code},
         )
+        r.raise_for_status()
+        return r.json()
+
+    # ---- Публикации форм (спека 171, ADR-0079) ----
+
+    def ef_publications(self) -> list[dict]:
+        """GET /api/external-forms-admin/publications/ — листинг публикаций.
+
+        Суперюзеру видны все, издателю — его (``admin_users``); PAT read
+        проходит (SAFE), publish/переходы закрыты энфорсером на сервере.
+        """
+        r = self._client.get("/api/external-forms-admin/publications/")
+        r.raise_for_status()
+        data = r.json()
+        return data.get("results") if isinstance(data, dict) else data or []
+
+    def ef_schema_preview(self, pk: int) -> dict:
+        """GET /api/external-forms-admin/publications/<pk>/schema-preview/."""
+        r = self._client.get(
+            f"/api/external-forms-admin/publications/{pk}/schema-preview/")
+        r.raise_for_status()
+        return r.json()
+
+    def ef_patch_publication(self, pk: int, payload: dict) -> dict:
+        """PATCH /api/external-forms-admin/publications/<pk>/ — правки
+        оверлея/метаданных (PAT draft; ADR-0079 п.2)."""
+        r = self._client.patch(
+            f"/api/external-forms-admin/publications/{pk}/", json=payload)
         r.raise_for_status()
         return r.json()
 

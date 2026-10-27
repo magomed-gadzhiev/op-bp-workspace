@@ -1,0 +1,16 @@
+# READ-ONLY: манифест public-полей базовой формы (для ws forms check).
+# Обновляется `pdm ws forms init`, не редактируется.
+fields:
+- name: Наименование проекта
+  type: string
+  required: true
+- name: Вид технологии
+  type: catalog_reference
+  required: true
+- name: Диаметр
+  type: number
+  required: false
+- name: Контактное лицо
+  type: string
+  required: true
+sections: []

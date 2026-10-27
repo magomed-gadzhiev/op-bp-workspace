@@ -12,6 +12,11 @@
       "id": "bpSlug",
       "type": "promptString",
       "description": "Слэг БП, например lem (для ws-check можно оставить пустым — проверится весь workspace)"
+    },
+    {
+      "id": "formSlug",
+      "type": "promptString",
+      "description": "Slug публикации формы, например demo-external-api (спека 171)"
     }
   ],
   "tasks": [
@@ -61,6 +66,96 @@
       "type": "shell",
       "command": "uv",
       "args": ["run", "--env-file", ".env", "--", "pdm", "ws", "report", "${input:bpSlug}"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": []
+    },
+    {
+      "label": "ws-findings-check",
+      "detail": "Офлайн-валидация workspace/_findings/*.md; --fix дописывает external_id/created_at",
+      "type": "shell",
+      "command": "uv",
+      "args": ["run", "--env-file", ".env", "--", "pdm", "ws", "findings", "check", "--fix"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": []
+    },
+    {
+      "label": "ws-findings-submit",
+      "detail": "Отправить замечания в PDM (идемпотентно по external_id)",
+      "type": "shell",
+      "command": "uv",
+      "args": ["run", "--env-file", ".env", "--", "pdm", "ws", "findings", "submit"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": []
+    },
+    {
+      "label": "ws-findings-list",
+      "detail": "Свои открытые замечания и их статусы",
+      "type": "shell",
+      "command": "uv",
+      "args": ["run", "--env-file", ".env", "--", "pdm", "ws", "findings", "list", "--open"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": []
+    },
+    {
+      "label": "ws-forms-list",
+      "detail": "Доступные публикации форм (slug, форма, версия)",
+      "type": "shell",
+      "command": "uv",
+      "args": ["run", "--env-file", ".env", "--", "pdm", "ws", "forms", "list"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": []
+    },
+    {
+      "label": "ws-forms-init",
+      "detail": "Выгрузить публикацию формы → workspace/forms/<slug>/publication.yaml",
+      "type": "shell",
+      "command": "uv",
+      "args": ["run", "--env-file", ".env", "--", "pdm", "ws", "forms", "init", "${input:formSlug}"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": []
+    },
+    {
+      "label": "ws-forms-check",
+      "detail": "Офлайн-проверка оверлея: имена полей, дубли, схема (Tier 0)",
+      "type": "shell",
+      "command": "uv",
+      "args": ["run", "--env-file", ".env", "--", "pdm", "ws", "forms", "check", "${input:formSlug}"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": []
+    },
+    {
+      "label": "ws-forms-diff",
+      "detail": "Diff publication.yaml против последнего init/push",
+      "type": "shell",
+      "command": "uv",
+      "args": ["run", "--env-file", ".env", "--", "pdm", "ws", "forms", "diff", "${input:formSlug}"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": []
+    },
+    {
+      "label": "ws-forms-push",
+      "detail": "Сохранить черновой оверлей на сервер (PAT draft); publish — только человек в PDM UI",
+      "type": "shell",
+      "command": "uv",
+      "args": ["run", "--env-file", ".env", "--", "pdm", "ws", "forms", "push", "${input:formSlug}"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": []
+    },
+    {
+      "label": "ws-forms-preview",
+      "detail": "Сводка схемы публикации: поля/секции/каталоги, отличие от активной версии",
+      "type": "shell",
+      "command": "uv",
+      "args": ["run", "--env-file", ".env", "--", "pdm", "ws", "forms", "preview", "${input:formSlug}"],
       "options": { "cwd": "${workspaceFolder}" },
       "presentation": { "reveal": "always", "panel": "dedicated" },
       "problemMatcher": []
